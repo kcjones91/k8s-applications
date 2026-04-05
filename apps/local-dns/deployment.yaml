@@ -41,6 +41,9 @@ spec:
       labels:
         app: coredns-local
     spec:
+      hostNetwork: true
+      nodeSelector:
+        kubernetes.io/hostname: swipe-worker-1
       containers:
       - name: coredns
         image: coredns/coredns:latest
@@ -57,24 +60,3 @@ spec:
       - name: config
         configMap:
           name: coredns-local
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: coredns-local
-  namespace: dns
-spec:
-  selector:
-    app: coredns-local
-  ports:
-  - name: dns-udp
-    port: 53
-    targetPort: 53
-    nodePort: 30053
-    protocol: UDP
-  - name: dns-tcp
-    port: 53
-    targetPort: 53
-    nodePort: 30053
-    protocol: TCP
-  type: NodePort
