@@ -6,7 +6,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://otwld.github.io/ollama-helm
+    repoURL: https://helm.otwld.com/
     chart: ollama
     targetRevision: "1.54.0"
     helm:
