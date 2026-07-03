@@ -1,0 +1,97 @@
+# Market Intel — the nightly pipeline (CronJob) + the API (Deployment/Service).
+# Image: build and push to your registry (ghcr.io/kcjones91/market-intel-backend
+# matches your vivian-portfolio pattern). Update the image refs below.
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: intel-pipeline
+  namespace: market-intel
+spec:
+  # 05:00 America/Chicago == 10:00/11:00 UTC depending on DST; timeZone pins it.
+  schedule: "0 5 * * *"
+  timeZone: "America/Chicago"
+  concurrencyPolicy: Forbid          # never overlap runs
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      activeDeadlineSeconds: 3600    # kill a hung run after an hour
+      template:
+        metadata:
+          labels: { app: intel-pipeline }
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: pipeline
+              image: ghcr.io/kcjones91/market-intel-backend:latest   # pin a tag in GitOps
+              command: ["/bin/sh", "-c"]
+              args:
+                - |
+                  set -e
+                  echo "== collect: congress ==" &&
+                  python -m app.workers.run_congress &&
+                  echo "== enrich: vLLM scoring ==" &&
+                  python -m app.workers.enrich
+              env:
+                - name: DATABASE_URL
+                  value: postgresql+asyncpg://intel:$(POSTGRES_PASSWORD)@postgres.market-intel.svc.cluster.local:5432/market_intel
+                - name: POSTGRES_PASSWORD
+                  valueFrom:
+                    secretKeyRef: { name: market-intel-secrets, key: POSTGRES_PASSWORD }
+                - name: CONGRESS_API_KEY
+                  valueFrom:
+                    secretKeyRef: { name: market-intel-secrets, key: CONGRESS_API_KEY }
+                # in-cluster route to your vLLM service (namespace vllm, port 80)
+                - name: VLLM_BASE_URL
+                  value: http://vllm.vllm.svc.cluster.local/v1
+                - name: VLLM_MODEL
+                  value: Qwen/Qwen2.5-7B-Instruct
+              resources:
+                requests: { cpu: "250m", memory: 512Mi }
+                limits: { memory: 1Gi }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: intel-api
+  namespace: market-intel
+  labels: { app: intel-api }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: intel-api }
+  template:
+    metadata:
+      labels: { app: intel-api }
+    spec:
+      containers:
+        - name: api
+          image: ghcr.io/kcjones91/market-intel-backend:latest       # pin a tag in GitOps
+          ports:
+            - { name: http, containerPort: 8000 }
+          env:
+            - name: DATABASE_URL
+              value: postgresql+asyncpg://intel:$(POSTGRES_PASSWORD)@postgres.market-intel.svc.cluster.local:5432/market_intel
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: market-intel-secrets, key: POSTGRES_PASSWORD }
+          readinessProbe:
+            httpGet: { path: /api/health, port: 8000 }
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests: { cpu: "250m", memory: 256Mi }
+            limits: { memory: 1Gi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: intel-api
+  namespace: market-intel
+spec:
+  type: NodePort
+  selector: { app: intel-api }
+  ports:
+    - { name: http, port: 80, targetPort: 8000, nodePort: 30830 }
