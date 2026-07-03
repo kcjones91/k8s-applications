@@ -30,6 +30,7 @@ spec:
       labels:
         app: vllm
     spec:
+      enableServiceLinks: false
       runtimeClassName: nvidia
       containers:
         - name: vllm
