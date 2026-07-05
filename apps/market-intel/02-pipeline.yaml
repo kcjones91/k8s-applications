@@ -25,7 +25,7 @@ spec:
           restartPolicy: Never
           containers:
             - name: pipeline
-              image: ghcr.io/kcjones91/market-intel-backend:latest   # pin a tag in GitOps
+              image: ghcr.io/kcjones91/market-intel-backend:v0.1.0  # pin a tag in GitOps
               command: ["/bin/sh", "-c"]
               args:
                 - |
@@ -68,7 +68,7 @@ spec:
     spec:
       containers:
         - name: api
-          image: ghcr.io/kcjones91/market-intel-backend:latest       # pin a tag in GitOps
+          image: ghcr.io/kcjones91/market-intel-backend:v0.1.0       # pin a tag in GitOps
           ports:
             - { name: http, containerPort: 8000 }
           env:
