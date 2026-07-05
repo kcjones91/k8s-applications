@@ -1,6 +1,7 @@
 # Market Intel — the nightly pipeline (CronJob) + the API (Deployment/Service).
 # Image: build and push to your registry (ghcr.io/kcjones91/market-intel-backend
 # matches your vivian-portfolio pattern). Update the image refs below.
+# Fix issue
 ---
 apiVersion: batch/v1
 kind: CronJob
@@ -25,7 +26,7 @@ spec:
           restartPolicy: Never
           containers:
             - name: pipeline
-              image: ghcr.io/kcjones91/market-intel-backend:v0.1.0  # pin a tag in GitOps
+              image: ghcr.io/kcjones91/market-intel-backend:latest   # pin a tag in GitOps
               command: ["/bin/sh", "-c"]
               args:
                 - |
@@ -35,11 +36,11 @@ spec:
                   echo "== enrich: vLLM scoring ==" &&
                   python -m app.workers.enrich
               env:
-                - name: DATABASE_URL
-                  value: postgresql+asyncpg://intel:$(POSTGRES_PASSWORD)@postgres.market-intel.svc.cluster.local:5432/market_intel
                 - name: POSTGRES_PASSWORD
                   valueFrom:
                     secretKeyRef: { name: market-intel-secrets, key: POSTGRES_PASSWORD }
+                - name: DATABASE_URL
+                  value: postgresql+asyncpg://intel:$(POSTGRES_PASSWORD)@postgres.market-intel.svc.cluster.local:5432/market_intel
                 - name: CONGRESS_API_KEY
                   valueFrom:
                     secretKeyRef: { name: market-intel-secrets, key: CONGRESS_API_KEY }
@@ -68,15 +69,15 @@ spec:
     spec:
       containers:
         - name: api
-          image: ghcr.io/kcjones91/market-intel-backend:v0.1.0       # pin a tag in GitOps
+          image: ghcr.io/kcjones91/market-intel-backend:latest       # pin a tag in GitOps
           ports:
             - { name: http, containerPort: 8000 }
           env:
-            - name: DATABASE_URL
-              value: postgresql+asyncpg://intel:$(POSTGRES_PASSWORD)@postgres.market-intel.svc.cluster.local:5432/market_intel
             - name: POSTGRES_PASSWORD
               valueFrom:
                 secretKeyRef: { name: market-intel-secrets, key: POSTGRES_PASSWORD }
+            - name: DATABASE_URL
+              value: postgresql+asyncpg://intel:$(POSTGRES_PASSWORD)@postgres.market-intel.svc.cluster.local:5432/market_intel
           readinessProbe:
             httpGet: { path: /api/health, port: 8000 }
             initialDelaySeconds: 5
