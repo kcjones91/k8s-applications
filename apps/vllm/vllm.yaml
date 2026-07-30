@@ -34,6 +34,8 @@ spec:
       runtimeClassName: nvidia
       containers:
         - name: vllm
+          # TODO: pin this. ":latest" + IfNotPresent means you never get updates
+          # until a node pulls fresh, and then you get an unreviewed version jump.
           image: vllm/vllm-openai:latest
           imagePullPolicy: IfNotPresent
           args:
@@ -45,10 +47,16 @@ spec:
             - "0.0.0.0"
             - "--port"
             - "8000"
+            # Qwen2.5-7B-Instruct is natively 32768. Was 8192.
+            # KV cache cost is ~56 KB/token (28 layers, 4 GQA KV heads,
+            # head_dim 128, bf16), so 32k full context is ~1.8 GB.
             - "--max-model-len"
-            - "8192"
+            - "32768"
             - "--gpu-memory-utilization"
             - "0.90"
+            # Chat UIs resend the whole history every turn; this makes the
+            # repeated prefix nearly free on time-to-first-token.
+            - "--enable-prefix-caching"
           ports:
             - name: http
               containerPort: 8000
