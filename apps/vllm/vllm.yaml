@@ -57,6 +57,9 @@ spec:
             # Chat UIs resend the whole history every turn; this makes the
             # repeated prefix nearly free on time-to-first-token.
             - "--enable-prefix-caching"
+            - "--enable-auto-tool-choice"
+            - "--tool-call-parser"
+            - "hermes"
           ports:
             - name: http
               containerPort: 8000
