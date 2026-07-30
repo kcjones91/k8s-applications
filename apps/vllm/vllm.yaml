@@ -1,15 +1,18 @@
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: vllm-cache
+  name: vllm-cache-v2
   namespace: vllm
 spec:
   accessModes:
     - ReadWriteOnce
+  # Renamed from vllm-cache: local-path does not support volume expansion,
+  # so an in-place size bump fails the sync. Argo creates this and prunes
+  # the old 40Gi PVC. Only a redownloadable HF cache is lost.
   storageClassName: local-path
   resources:
     requests:
-      storage: 40Gi
+      storage: 100Gi
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -34,32 +37,39 @@ spec:
       runtimeClassName: nvidia
       containers:
         - name: vllm
-          # TODO: pin this. ":latest" + IfNotPresent means you never get updates
-          # until a node pulls fresh, and then you get an unreviewed version jump.
+          # Qwen3.6 needs vLLM 0.17.0+ (gated delta network attention).
+          # Always, not IfNotPresent: the node has a stale cached :latest
+          # that will fail with an unknown-architecture error.
+          # TODO: read the version from the startup log and pin it here.
           image: vllm/vllm-openai:latest
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Always
           args:
+            # 4-bit AWQ. FP8 is ~27GB of weights and needs SM 8.9+;
+            # the 3090 is SM 8.6 with 24GB, so neither applies.
             - "--model"
-            - "Qwen/Qwen2.5-7B-Instruct"
+            - "QuantTrio/Qwen3.6-27B-AWQ"
             - "--served-model-name"
-            - "Qwen/Qwen2.5-7B-Instruct"
+            - "Qwen3.6-27B"
             - "--host"
             - "0.0.0.0"
             - "--port"
             - "8000"
-            # Qwen2.5-7B-Instruct is natively 32768. Was 8192.
-            # KV cache cost is ~56 KB/token (28 layers, 4 GQA KV heads,
-            # head_dim 128, bf16), so 32k full context is ~1.8 GB.
+            # Native context is 262144. Not affordable here -- ~15GB of
+            # weights leaves roughly 7GB for KV. Start conservative and
+            # raise once the startup log shows available KV blocks.
             - "--max-model-len"
             - "32768"
             - "--gpu-memory-utilization"
-            - "0.90"
-            # Chat UIs resend the whole history every turn; this makes the
-            # repeated prefix nearly free on time-to-first-token.
+            - "0.92"
             - "--enable-prefix-caching"
+            # Qwen3.6 parsers. hermes was Qwen2.5-only and would return
+            # empty tool_calls with no error on this model.
             - "--enable-auto-tool-choice"
             - "--tool-call-parser"
-            - "hermes"
+            - "qwen3_coder"
+            - "--reasoning-parser"
+            - "qwen3"
+            - "--trust-remote-code"
           ports:
             - name: http
               containerPort: 8000
@@ -74,10 +84,11 @@ spec:
           resources:
             requests:
               cpu: "4"
-              memory: 16Gi
+              memory: 8Gi
             limits:
               nvidia.com/gpu: 1
-              memory: 32Gi
+              # Node has ~32GB total; the old 32Gi limit was the whole box.
+              memory: 24Gi
           volumeMounts:
             - name: cache
               mountPath: /cache
@@ -87,23 +98,26 @@ spec:
             httpGet:
               path: /health
               port: 8000
-            initialDelaySeconds: 60
+            initialDelaySeconds: 90
             periodSeconds: 15
-            failureThreshold: 40
+            # ~15GB cold download on first boot; 60 x 15s = 15 min.
+            failureThreshold: 60
           livenessProbe:
             httpGet:
               path: /health
               port: 8000
-            initialDelaySeconds: 300
+            initialDelaySeconds: 900
             periodSeconds: 30
+            failureThreshold: 6
       volumes:
         - name: cache
           persistentVolumeClaim:
-            claimName: vllm-cache
+            claimName: vllm-cache-v2
         - name: shm
           emptyDir:
             medium: Memory
-            sizeLimit: 4Gi
+            # Counts against the pod memory limit above.
+            sizeLimit: 2Gi
 ---
 apiVersion: v1
 kind: Service
