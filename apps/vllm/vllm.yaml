@@ -1,18 +1,15 @@
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: vllm-cache-v2
+  name: vllm-cache
   namespace: vllm
 spec:
   accessModes:
     - ReadWriteOnce
-  # Renamed from vllm-cache: local-path does not support volume expansion,
-  # so an in-place size bump fails the sync. Argo creates this and prunes
-  # the old 40Gi PVC. Only a redownloadable HF cache is lost.
   storageClassName: local-path
   resources:
     requests:
-      storage: 100Gi
+      storage: 40Gi
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -37,33 +34,32 @@ spec:
       runtimeClassName: nvidia
       containers:
         - name: vllm
-          # Qwen3.6 needs vLLM 0.17.0+ (gated delta network attention).
-          # Always, not IfNotPresent: the node has a stale cached :latest
-          # that will fail with an unknown-architecture error.
-          # TODO: read the version from the startup log and pin it here.
+          # Confirmed working on this node: v0.26.0 loaded AWQ via
+          # MarlinLinearKernel fine. Pin once this boot succeeds.
           image: vllm/vllm-openai:latest
           imagePullPolicy: Always
           args:
-            # 4-bit AWQ. FP8 is ~27GB of weights and needs SM 8.9+;
-            # the 3090 is SM 8.6 with 24GB, so neither applies.
+            # Verified 12.38 GB of safetensors -> ~9.3 GiB headroom at 0.92.
+            # Do not swap this without re-running the HF size check;
+            # the vision tower and GDN layers stay fp16, so "4-bit"
+            # does not mean what the GGUF tables say it means.
             - "--model"
-            - "QuantTrio/Qwen3.6-27B-AWQ"
+            - "QuantTrio/Qwen3.5-9B-AWQ"
             - "--served-model-name"
-            - "Qwen3.6-27B"
+            - "Qwen3.5-9B"
             - "--host"
             - "0.0.0.0"
             - "--port"
             - "8000"
-            # Native context is 262144. Not affordable here -- ~15GB of
-            # weights leaves roughly 7GB for KV. Start conservative and
-            # raise once the startup log shows available KV blocks.
+            # Conservative first boot. Raise after reading the reported
+            # KV cache size in the startup log.
             - "--max-model-len"
             - "32768"
             - "--gpu-memory-utilization"
             - "0.92"
             - "--enable-prefix-caching"
-            # Qwen3.6 parsers. hermes was Qwen2.5-only and would return
-            # empty tool_calls with no error on this model.
+            # Qwen3.5 first-party guidance: qwen3 reasoning, qwen3_coder tools.
+            # NOT hermes -- that was Qwen2.5-only.
             - "--enable-auto-tool-choice"
             - "--tool-call-parser"
             - "qwen3_coder"
@@ -87,36 +83,39 @@ spec:
               memory: 8Gi
             limits:
               nvidia.com/gpu: 1
-              # Node has ~32GB total; the old 32Gi limit was the whole box.
               memory: 24Gi
           volumeMounts:
             - name: cache
               mountPath: /cache
             - name: shm
               mountPath: /dev/shm
+          # Suspends liveness/readiness until the model is up.
+          # 240 x 15s = 60 min for the cold download.
+          startupProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            periodSeconds: 15
+            failureThreshold: 240
           readinessProbe:
             httpGet:
               path: /health
               port: 8000
-            initialDelaySeconds: 90
             periodSeconds: 15
-            # ~15GB cold download on first boot; 60 x 15s = 15 min.
-            failureThreshold: 60
+            failureThreshold: 4
           livenessProbe:
             httpGet:
               path: /health
               port: 8000
-            initialDelaySeconds: 900
             periodSeconds: 30
             failureThreshold: 6
       volumes:
         - name: cache
           persistentVolumeClaim:
-            claimName: vllm-cache-v2
+            claimName: vllm-cache
         - name: shm
           emptyDir:
             medium: Memory
-            # Counts against the pod memory limit above.
             sizeLimit: 2Gi
 ---
 apiVersion: v1
