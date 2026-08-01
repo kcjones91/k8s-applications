@@ -58,8 +58,6 @@ spec:
           value: "gitea.swipe.local"
         - name: GITEA__server__SSH_PORT
           value: "30222"
-        - name: GITEA__server__START_SSH_SERVER
-          value: "true"
         - name: GITEA__service__DISABLE_REGISTRATION
           value: "true"
         - name: GITEA__security__INSTALL_LOCK
