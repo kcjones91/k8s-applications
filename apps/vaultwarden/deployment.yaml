@@ -38,6 +38,8 @@ spec:
         env:
         - name: WEBSOCKET_ENABLED
           value: "true"
+        - name: DOMAIN
+          value: "https://vault.lab.swipe.lat"
         - name: SIGNUPS_ALLOWED
           value: "true"
         - name: ADMIN_TOKEN
@@ -66,3 +68,19 @@ spec:
     targetPort: 80
     nodePort: 30180
   type: NodePort
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: vaultwarden
+  namespace: vaultwarden
+spec:
+  parentRefs:
+    - name: lab
+      namespace: gateway
+  hostnames:
+    - vault.lab.swipe.lat
+  rules:
+    - backendRefs:
+        - name: vaultwarden
+          port: 80
