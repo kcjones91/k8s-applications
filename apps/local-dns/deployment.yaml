@@ -10,9 +10,15 @@ metadata:
   namespace: dns
 data:
   Corefile: |
+    lab.swipe.lat:53 {
+      template IN A {
+        match "^.*\.lab\.swipe\.lat\.$"
+        answer "{{ .Name }} 60 IN A 192.168.1.224"
+      }
+      reload
+    }
     swipe.local:53 {
       hosts {
-        192.168.1.171 aap-01.swipe.lab
         192.168.1.224 gitea.swipe.local
         192.168.1.224 chat.swipe.local
         192.168.1.224 argocd.swipe.local
