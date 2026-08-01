@@ -26,9 +26,13 @@ data:
             icon: argocd
         - Ansible Automation Platform:
             href: https://aap.lab.swipe.lat
-            description: AAP 2.7 on the aap-01 VM, worker-3
+            description: AAP 2.7, aap-01 VM on worker-3
             icon: ansible
     - Infrastructure:
+        - Immich:
+            href: https://photos.lab.swipe.lat
+            description: Photo and video backup, 250Gi on worker-1
+            icon: immich
         - Open WebUI:
             href: https://chat.lab.swipe.lat
             description: Chat front-end for vLLM
