@@ -12,11 +12,11 @@ data:
   Corefile: |
     lab.swipe.lat:53 {
       hosts {
-        192.168.1.224 gitea.lab.swipe.lat
-        192.168.1.224 argocd.lab.swipe.lat
-        192.168.1.224 chat.lab.swipe.lat
-        192.168.1.224 hubble.lab.swipe.lat
-        192.168.1.224 vault.lab.swipe.lat
+        192.168.1.240 gitea.lab.swipe.lat
+        192.168.1.240 argocd.lab.swipe.lat
+        192.168.1.240 chat.lab.swipe.lat
+        192.168.1.240 hubble.lab.swipe.lat
+        192.168.1.240 vault.lab.swipe.lat
         fallthrough
       }
       reload
