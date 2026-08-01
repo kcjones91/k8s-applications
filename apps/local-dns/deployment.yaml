@@ -11,9 +11,13 @@ metadata:
 data:
   Corefile: |
     lab.swipe.lat:53 {
-      template IN A {
-        match "^.*\.lab\.swipe\.lat\.$"
-        answer "{{ .Name }} 60 IN A 192.168.1.224"
+      hosts {
+        192.168.1.224 gitea.lab.swipe.lat
+        192.168.1.224 argocd.lab.swipe.lat
+        192.168.1.224 chat.lab.swipe.lat
+        192.168.1.224 hubble.lab.swipe.lat
+        192.168.1.224 vault.lab.swipe.lat
+        fallthrough
       }
       reload
     }
