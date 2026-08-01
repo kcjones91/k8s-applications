@@ -1,0 +1,27 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kubevirt
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: git@github.com:kcjones91/k8s-applications.git
+    targetRevision: HEAD
+    path: infrastructure/kubevirt
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kubevirt
+  syncPolicy:
+    automated:
+      # Off deliberately. virt-operator mutates its own Deployments and
+      # rotates certs; selfHeal will fight it. prune on an operator that
+      # owns ~40 resources is how you delete a running virt stack by
+      # accident. Turn these on later once it's been stable for a while.
+      prune: false
+      selfHeal: false
+    syncOptions:
+      - CreateNamespace=true
+      # Non-negotiable. KubeVirt's CRDs blow past the 256KB
+      # last-applied-configuration annotation limit on client-side apply.
+      - ServerSideApply=true

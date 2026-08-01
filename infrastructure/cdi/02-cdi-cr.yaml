@@ -1,0 +1,15 @@
+apiVersion: cdi.kubevirt.io/v1beta1
+kind: CDI
+metadata:
+  name: cdi
+  annotations:
+    argocd.argoproj.io/sync-wave: "5"
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  imagePullPolicy: IfNotPresent
+  infra:
+    nodeSelector:
+      kubernetes.io/os: linux
+  config:
+    featureGates:
+      - HonorWaitForFirstConsumer

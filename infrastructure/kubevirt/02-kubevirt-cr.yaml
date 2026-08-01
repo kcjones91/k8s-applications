@@ -1,0 +1,26 @@
+apiVersion: kubevirt.io/v1
+kind: KubeVirt
+metadata:
+  name: kubevirt
+  namespace: kubevirt
+  annotations:
+    # The KubeVirt CRD ships in 01-operator.yaml, so on a first sync this
+    # resource's type does not exist yet. Both of these are required or
+    # Argo fails the dry-run and the whole app never syncs.
+    argocd.argoproj.io/sync-wave: "5"
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  certificateRotateStrategy: {}
+  imagePullPolicy: IfNotPresent
+  workloadUpdateStrategy:
+    # Restart VMs on KubeVirt upgrade rather than live-migrating them.
+    # local-path is RWO and node-bound, so LiveMigrate would just fail.
+    workloadUpdateMethods:
+      - Evict
+  configuration:
+    developerConfiguration:
+      featureGates:
+        - ExpandDisks
+    # All four nodes report /dev/kvm, so emulation stays off.
+    # If you ever add a node without VT-x, that node simply won't
+    # advertise devices.kubevirt.io/kvm and VMs won't schedule there.
