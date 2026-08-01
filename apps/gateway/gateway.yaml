@@ -1,0 +1,50 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: gateway
+---
+# The wildcard cert has to live in the Gateway's namespace.
+# This replaces the per-namespace Certificates the Ingress
+# approach would have needed.
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: lab-wildcard
+  namespace: gateway
+spec:
+  secretName: lab-wildcard-tls
+  issuerRef:
+    name: letsencrypt
+    kind: ClusterIssuer
+  dnsNames:
+    - "*.lab.swipe.lat"
+    - "lab.swipe.lat"
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: lab
+  namespace: gateway
+spec:
+  gatewayClassName: cilium
+  listeners:
+    - name: https
+      protocol: HTTPS
+      port: 443
+      hostname: "*.lab.swipe.lat"
+      tls:
+        certificateRefs:
+          - kind: Secret
+            name: lab-wildcard-tls
+      allowedRoutes:
+        # Lets HTTPRoutes in gitea, argocd, etc. attach to this
+        # Gateway without a ReferenceGrant each.
+        namespaces:
+          from: All
+    - name: http
+      protocol: HTTP
+      port: 80
+      hostname: "*.lab.swipe.lat"
+      allowedRoutes:
+        namespaces:
+          from: All
