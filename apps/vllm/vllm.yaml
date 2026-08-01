@@ -83,7 +83,7 @@ spec:
               memory: 16Gi
             limits:
               nvidia.com/gpu: 1
-              memory: 24Gi
+              memory: 12Gi
           volumeMounts:
             - name: cache
               mountPath: /cache
