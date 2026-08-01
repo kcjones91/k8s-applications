@@ -30,7 +30,7 @@ spec:
         cpu:
           cores: 6
         memory:
-          guest: 12Gi
+          guest: 16Gi
         devices:
           disks:
             - name: rootdisk
