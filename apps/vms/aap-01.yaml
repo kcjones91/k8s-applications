@@ -1,0 +1,72 @@
+apiVersion: kubevirt.io/v1
+kind: VirtualMachine
+metadata:
+  name: aap-01
+  namespace: vms
+spec:
+  runStrategy: Manual
+  dataVolumeTemplates:
+    - metadata:
+        name: aap-01-root
+      spec:
+        source:
+          registry:
+            url: "docker://registry.redhat.io/rhel9/rhel-guest-image:9.6"
+            secretRef: redhat-registry
+        storage:
+          accessModes:
+            - ReadWriteOnce
+          storageClassName: local-path
+          resources:
+            requests:
+              # Containerized AAP pulls a lot of images into podman
+              # storage under the install user's home. Do not skimp.
+              storage: 100Gi
+  template:
+    spec:
+      nodeSelector:
+        kubernetes.io/hostname: swipe-worker-1
+      domain:
+        cpu:
+          cores: 4
+        memory:
+          guest: 8Gi
+        devices:
+          disks:
+            - name: rootdisk
+              disk:
+                bus: virtio
+            - name: cloudinit
+              disk:
+                bus: virtio
+          interfaces:
+            - name: default
+              masquerade: {}
+          rng: {}
+      networks:
+        - name: default
+          pod: {}
+      terminationGracePeriodSeconds: 180
+      volumes:
+        - name: rootdisk
+          dataVolume:
+            name: aap-01-root
+        - name: cloudinit
+          cloudInitNoCloud:
+            userData: |-
+              #cloud-config
+              users:
+                - name: cloud-user
+                  groups: [wheel]
+                  lock_passwd: false
+                  # Generate with: mkpasswd -m sha-512
+                  passwd: $6$rounds=4096$REPLACE_ME
+                  shell: /bin/bash
+                  sudo: ALL=(ALL) ALL
+                  ssh_authorized_keys:
+                    - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIB8eSUDCuB0gyK+vPE4tdGmK9wgcZs9Tc27/2On/NmlV kylejones199108@gmail.com
+              ssh_pwauth: true
+              packages:
+                - qemu-guest-agent
+              runcmd:
+                - systemctl enable --now qemu-guest-agent
