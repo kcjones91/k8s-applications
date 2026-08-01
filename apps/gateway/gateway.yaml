@@ -48,3 +48,25 @@ spec:
       allowedRoutes:
         namespaces:
           from: All
+---
+apiVersion: cilium.io/v2alpha1
+kind: CiliumLoadBalancerIPPool
+metadata:
+  name: lab-pool
+spec:
+  blocks:
+    # Must be OUTSIDE the router's DHCP range or you'll get
+    # intermittent conflicts.
+    - start: "192.168.1.240"
+      stop: "192.168.1.250"
+---
+apiVersion: cilium.io/v2alpha1
+kind: CiliumL2AnnouncementPolicy
+metadata:
+  name: lab-l2
+spec:
+  # Announce on the LAN interface only, not tailscale0
+  interfaces:
+    - enp2s0
+  externalIPs: true
+  loadBalancerIPs: true
