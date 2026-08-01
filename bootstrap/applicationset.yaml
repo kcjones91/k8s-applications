@@ -10,6 +10,8 @@ spec:
       revision: HEAD
       directories:
       - path: apps/*
+      - path: apps/vms
+        exclude: true
   template:
     metadata:
       name: '{{path.basename}}'

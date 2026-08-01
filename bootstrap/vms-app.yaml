@@ -1,0 +1,25 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: vms
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: git@github.com:kcjones91/k8s-applications.git
+    targetRevision: HEAD
+    path: apps/vms
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: vms
+  syncPolicy:
+    automated:
+      # Deliberately off. Pruning a VirtualMachine deletes its
+      # dataVolumeTemplate PVC — that's the guest disk. Delete VMs
+      # by hand, on purpose.
+      prune: false
+      # Enable once you've confirmed no perpetual drift against
+      # the KubeVirt controllers.
+      selfHeal: false
+    syncOptions:
+      - CreateNamespace=true
