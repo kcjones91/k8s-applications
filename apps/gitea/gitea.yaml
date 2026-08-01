@@ -1,0 +1,98 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: gitea
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: gitea-data
+  namespace: gitea
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 20Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gitea
+  namespace: gitea
+spec:
+  replicas: 1
+  strategy:
+    # local-path is RWO and node-bound; a rolling update would deadlock
+    # waiting for the new pod to mount a volume the old pod still holds.
+    type: Recreate
+  selector:
+    matchLabels:
+      app: gitea
+  template:
+    metadata:
+      labels:
+        app: gitea
+    spec:
+      # Pin to worker-1: it has 449G free and no other workload since
+      # the AAP VM moved to worker-3. local-path binds the PVC here.
+      nodeSelector:
+        kubernetes.io/hostname: swipe-worker-1
+      containers:
+      - name: gitea
+        image: gitea/gitea:latest
+        ports:
+        - containerPort: 3000
+          name: http
+        - containerPort: 22
+          name: ssh
+        env:
+        # SQLite is plenty for a single-user lab and avoids running
+        # a separate postgres. Switch to postgres if this grows.
+        - name: GITEA__database__DB_TYPE
+          value: sqlite3
+        - name: GITEA__server__ROOT_URL
+          value: "http://gitea.swipe.local:30300/"
+        - name: GITEA__server__SSH_DOMAIN
+          value: "gitea.swipe.local"
+        - name: GITEA__server__SSH_PORT
+          value: "30222"
+        - name: GITEA__server__START_SSH_SERVER
+          value: "true"
+        - name: GITEA__service__DISABLE_REGISTRATION
+          value: "true"
+        - name: GITEA__security__INSTALL_LOCK
+          value: "true"
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            memory: 1Gi
+        volumeMounts:
+        - name: gitea-data
+          mountPath: /data
+      volumes:
+      - name: gitea-data
+        persistentVolumeClaim:
+          claimName: gitea-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: gitea
+  namespace: gitea
+spec:
+  type: NodePort
+  selector:
+    app: gitea
+  ports:
+  - name: http
+    port: 3000
+    targetPort: 3000
+    nodePort: 30300
+  - name: ssh
+    port: 22
+    targetPort: 22
+    nodePort: 30222
