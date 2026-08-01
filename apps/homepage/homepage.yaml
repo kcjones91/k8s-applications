@@ -1,3 +1,51 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: homepage
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: homepage-config
+  namespace: homepage
+data:
+  settings.yaml: |
+    title: swipe-lab
+    theme: dark
+    color: slate
+    headerStyle: clean
+  services.yaml: |
+    - Platform:
+        - Gitea:
+            href: https://gitea.lab.swipe.lat
+            description: Git hosting, SQLite, worker-1
+            icon: gitea
+        - ArgoCD:
+            href: https://argocd.lab.swipe.lat
+            description: GitOps for this cluster
+            icon: argocd
+        - Ansible Automation Platform:
+            href: https://aap.lab.swipe.lat
+            description: AAP 2.7 on the aap-01 VM, worker-3
+            icon: ansible
+    - Infrastructure:
+        - Open WebUI:
+            href: https://chat.lab.swipe.lat
+            description: Chat front-end for vLLM
+            icon: open-webui
+        - Vaultwarden:
+            href: http://192.168.1.224:30180
+            description: No TLS yet, needs an HTTPRoute
+            icon: vaultwarden
+  widgets.yaml: |
+    - resources:
+        cpu: true
+        memory: true
+  bookmarks.yaml: |
+    - Reference:
+        - KubeVirt:
+            - href: https://kubevirt.io/user-guide/
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -36,7 +84,7 @@ spec:
         # which fails on a plain ConfigMap mount (read-only).
         - name: config-dir
           mountPath: /app/config
-        # Individual files layered in via subPath so the parent stays writable.
+        # Files layered in via subPath so the parent stays writable.
         - name: config-files
           mountPath: /app/config/settings.yaml
           subPath: settings.yaml
@@ -55,3 +103,31 @@ spec:
       - name: config-files
         configMap:
           name: homepage-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: homepage
+  namespace: homepage
+spec:
+  selector:
+    app: homepage
+  ports:
+  - port: 3000
+    targetPort: 3000
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: homepage
+  namespace: homepage
+spec:
+  parentRefs:
+    - name: lab
+      namespace: gateway
+  hostnames:
+    - home.lab.swipe.lat
+  rules:
+    - backendRefs:
+        - name: homepage
+          port: 3000
