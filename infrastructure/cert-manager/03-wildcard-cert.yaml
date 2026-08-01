@@ -1,0 +1,19 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: lab-wildcard
+  # Issued into cert-manager's namespace; copied to each app
+  # namespace below, since Ingress TLS secrets must be local.
+  namespace: cert-manager
+  annotations:
+    argocd.argoproj.io/sync-wave: "10"
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  secretName: lab-wildcard-tls
+  issuerRef:
+    name: letsencrypt
+    kind: ClusterIssuer
+  commonName: "*.lab.swipe.lat"
+  dnsNames:
+    - "*.lab.swipe.lat"
+    - "lab.swipe.lat"
