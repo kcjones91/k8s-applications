@@ -34,8 +34,8 @@ data:
             description: Chat front-end for vLLM
             icon: open-webui
         - Vaultwarden:
-            href: http://192.168.1.224:30180
-            description: No TLS yet, needs an HTTPRoute
+            href: https://vault.lab.swipe.lat
+            description: Password vault
             icon: vaultwarden
   widgets.yaml: |
     - resources:
