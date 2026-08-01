@@ -1,0 +1,133 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: homepage
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: homepage-config
+  namespace: homepage
+data:
+  settings.yaml: |
+    title: swipe-lab
+    theme: dark
+    color: slate
+    headerStyle: clean
+    layout:
+      Platform:
+        style: row
+        columns: 3
+      Infrastructure:
+        style: row
+        columns: 3
+  services.yaml: |
+    - Platform:
+        - Gitea:
+            href: https://gitea.lab.swipe.lat
+            description: Git hosting, SQLite, worker-1
+            icon: gitea
+        - ArgoCD:
+            href: https://argocd.lab.swipe.lat
+            description: GitOps for everything in this cluster
+            icon: argocd
+        - Ansible Automation Platform:
+            href: https://aap.lab.swipe.lat
+            description: AAP 2.7 containerized, aap-01 VM on worker-3
+            icon: ansible
+    - Infrastructure:
+        - Open WebUI:
+            href: https://chat.lab.swipe.lat
+            description: Chat front-end for vLLM
+            icon: open-webui
+        - Vaultwarden:
+            href: http://192.168.1.224:30180
+            description: No TLS yet — needs an HTTPRoute
+            icon: vaultwarden
+        - Hubble:
+            href: http://192.168.1.224:30081
+            description: Cilium network observability
+            icon: cilium
+  widgets.yaml: |
+    - resources:
+        cpu: true
+        memory: true
+    - search:
+        provider: duckduckgo
+        target: _blank
+  bookmarks.yaml: |
+    - Reference:
+        - KubeVirt docs:
+            - href: https://kubevirt.io/user-guide/
+        - Gateway API:
+            - href: https://gateway-api.sigs.k8s.io/
+  docker.yaml: ""
+  kubernetes.yaml: ""
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: homepage
+  namespace: homepage
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: homepage
+  template:
+    metadata:
+      labels:
+        app: homepage
+    spec:
+      containers:
+      - name: homepage
+        image: ghcr.io/gethomepage/homepage:latest
+        ports:
+        - containerPort: 3000
+        env:
+        # Required since v0.9 — Homepage returns a blank page or a
+        # host-check error without this. Must match the Host header
+        # the Gateway forwards.
+        - name: HOMEPAGE_ALLOWED_HOSTS
+          value: "home.lab.swipe.lat"
+        resources:
+          requests:
+            cpu: 50m
+            memory: 128Mi
+          limits:
+            memory: 256Mi
+        volumeMounts:
+        - name: config
+          mountPath: /app/config
+      volumes:
+      - name: config
+        configMap:
+          name: homepage-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: homepage
+  namespace: homepage
+spec:
+  selector:
+    app: homepage
+  ports:
+  - port: 3000
+    targetPort: 3000
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: homepage
+  namespace: homepage
+spec:
+  parentRefs:
+    - name: lab
+      namespace: gateway
+  hostnames:
+    - home.lab.swipe.lat
+  rules:
+    - backendRefs:
+        - name: homepage
+          port: 3000
