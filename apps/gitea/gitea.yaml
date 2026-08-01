@@ -53,9 +53,9 @@ spec:
         - name: GITEA__database__DB_TYPE
           value: sqlite3
         - name: GITEA__server__ROOT_URL
-          value: "http://gitea.swipe.local:30300/"
+          value: "https://gitea.lab.swipe.lat/"
         - name: GITEA__server__SSH_DOMAIN
-          value: "gitea.swipe.local"
+          value: "gitea.lab.swipe.lat"
         - name: GITEA__server__SSH_PORT
           value: "30222"
         - name: GITEA__service__DISABLE_REGISTRATION
@@ -94,3 +94,38 @@ spec:
     port: 22
     targetPort: 22
     nodePort: 30222
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: gitea-tls
+  namespace: gitea
+spec:
+  secretName: gitea-tls
+  issuerRef:
+    name: letsencrypt
+    kind: ClusterIssuer
+  dnsNames:
+    - gitea.lab.swipe.lat
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: gitea
+  namespace: gitea
+spec:
+  tls:
+    - hosts:
+        - gitea.lab.swipe.lat
+      secretName: gitea-tls
+  rules:
+    - host: gitea.lab.swipe.lat
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: gitea
+                port:
+                  number: 3000
