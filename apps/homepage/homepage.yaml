@@ -79,15 +79,19 @@ spec:
       labels:
         app: homepage
     spec:
+      # Must be on worker-1: the Gateway's L2 announcement is pinned
+      # there, and cross-node forwarding from Envoy to a pod on another
+      # node currently times out. Landed on worker-2 initially and 503'd.
+      nodeSelector:
+        kubernetes.io/hostname: swipe-worker-1
       containers:
       - name: homepage
         image: ghcr.io/gethomepage/homepage:latest
         ports:
         - containerPort: 3000
         env:
-        # Required since v0.9 — Homepage returns a blank page or a
-        # host-check error without this. Must match the Host header
-        # the Gateway forwards.
+        # Required since v0.9 — without it Homepage rejects the request
+        # or renders blank. Must match the Host header the Gateway sends.
         - name: HOMEPAGE_ALLOWED_HOSTS
           value: "home.lab.swipe.lat"
         resources:
