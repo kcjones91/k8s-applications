@@ -59,8 +59,7 @@ spec:
                 - name: cloud-user
                   groups: [wheel]
                   lock_passwd: false
-                  # Generate with: mkpasswd -m sha-512
-                  passwd: $6$rounds=4096$REPLACE_ME
+                  passwd: $6$aweJIsPm5HsfQg5j$uuSu3n0zRd3oJiMVOZpiY1sfWuXKtm6I6pdA1/QvaDOyw4Dc4NQPeJoZ10q7pl9jI9RBFMRqDDJoA/2B5dwN11
                   shell: /bin/bash
                   sudo: ALL=(ALL) ALL
                   ssh_authorized_keys:
