@@ -13,7 +13,7 @@ data:
     swipe.local:53 {
       hosts {
         192.168.1.171 aap-01.swipe.lab
-        192.168.1.50 gitea.swipe.lab
+        192.168.1.224 gitea.swipe.local
         192.168.1.224 chat.swipe.local
         192.168.1.224 argocd.swipe.local
         192.168.1.224 ollama.swipe.local
