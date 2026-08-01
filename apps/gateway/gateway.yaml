@@ -65,7 +65,11 @@ kind: CiliumL2AnnouncementPolicy
 metadata:
   name: lab-l2
 spec:
-  # Announce on the LAN interface only, not tailscale0
+  # Interface names differ per node (enp2s0 / eno1 / enp90s0), so the
+  # policy must be pinned to a node where the named interface exists.
+  nodeSelector:
+    matchLabels:
+      kubernetes.io/hostname: swipe-worker-1
   interfaces:
     - enp2s0
   externalIPs: true
