@@ -83,6 +83,7 @@ spec:
                   sudo: ALL=(ALL) NOPASSWD:ALL
                   ssh_authorized_keys:
                     - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIB8eSUDCuB0gyK+vPE4tdGmK9wgcZs9Tc27/2On/NmlV kylejones199108@gmail.com
+                    - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHvU6f0BXjbP+hKW/QgOhPrkLUSZ0+i6pjOM4Cuo6ql7 afemiadom@icloud.com
               ssh_pwauth: true
               packages:
                 - qemu-guest-agent
