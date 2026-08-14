@@ -37,7 +37,7 @@ spec:
           storageClassName: local-path
           resources:
             requests:
-              storage: 15Gi
+              storage: 25Gi
   template:
     metadata:
       labels:
@@ -100,6 +100,94 @@ spec:
   loadBalancerIP: 192.168.1.242
   selector:
     vm.kubevirt.io/name: rhel-server-1
+  ports:
+    - name: ssh
+      port: 22
+      targetPort: 22
+---
+apiVersion: kubevirt.io/v1
+kind: VirtualMachine
+metadata:
+  name: rhel-server-2
+  namespace: vms
+spec:
+  runStrategy: Always
+  dataVolumeTemplates:
+    - metadata:
+        name: rhel-server-2-root
+      spec:
+        source:
+          pvc:
+            name: rhel9-golden
+            namespace: vms
+        storage:
+          accessModes: [ReadWriteOnce]
+          storageClassName: local-path
+          resources:
+            requests:
+              storage: 25Gi
+  template:
+    metadata:
+      labels:
+        vm.kubevirt.io/name: rhel-server-2
+    spec:
+      nodeSelector:
+        kubernetes.io/hostname: swipe-worker-2
+      domain:
+        cpu:
+          cores: 1
+        memory:
+          guest: 2Gi
+        devices:
+          disks:
+            - name: rootdisk
+              disk:
+                bus: virtio
+            - name: cloudinit
+              disk:
+                bus: virtio
+          interfaces:
+            - name: default
+              masquerade: {}
+          rng: {}
+      networks:
+        - name: default
+          pod: {}
+      volumes:
+        - name: rootdisk
+          dataVolume:
+            name: rhel-server-2-root
+        - name: cloudinit
+          cloudInitNoCloud:
+            userData: |-
+              #cloud-config
+              users:
+                - name: cloud-user
+                  groups: [wheel]
+                  lock_passwd: false
+                  passwd: $6$BfvlW/aQVsfAhGTE$ki3zS43a2XuGKA/1fWZJqxXdZTSfnCUy5yn1NV23rHTziMZl8vSmQpCJoQjCzAznFnYjg8Uey0SwTXUGIxa8k0
+                  shell: /bin/bash
+                  # NOPASSWD deliberately: AAP's become runs unattended
+                  sudo: ALL=(ALL) NOPASSWD:ALL
+                  ssh_authorized_keys:
+                    - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIB8eSUDCuB0gyK+vPE4tdGmK9wgcZs9Tc27/2On/NmlV kylejones199108@gmail.com
+                    - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHvU6f0BXjbP+hKW/QgOhPrkLUSZ0+i6pjOM4Cuo6ql7 afemiadom@icloud.com
+              ssh_pwauth: true
+              packages:
+                - qemu-guest-agent
+              runcmd:
+                - systemctl enable --now qemu-guest-agent
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: rhel-server-2
+  namespace: vms
+spec:
+  type: LoadBalancer
+  loadBalancerIP: 192.168.1.243
+  selector:
+    vm.kubevirt.io/name: rhel-server-2
   ports:
     - name: ssh
       port: 22
