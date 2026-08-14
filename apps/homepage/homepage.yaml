@@ -14,6 +14,16 @@ data:
     theme: dark
     color: slate
     headerStyle: clean
+    layout:
+      Platform:
+        style: row
+        columns: 3
+      Infrastructure:
+        style: row
+        columns: 3
+      RHEL Servers:
+        style: row
+        columns: 2
   services.yaml: |
     - Platform:
         - Gitea:
@@ -41,6 +51,15 @@ data:
             href: https://vault.lab.swipe.lat
             description: Password vault
             icon: vaultwarden
+    - RHEL Servers:
+        - rhel-server-1:
+            href: ssh://cloud-user@192.168.1.242
+            description: "ssh cloud-user@192.168.1.242 — Ansible managed node, worker-2"
+            icon: redhat
+        - rhel-server-2:
+            href: ssh://cloud-user@192.168.1.243
+            description: "ssh cloud-user@192.168.1.243 — Ansible managed node, worker-2"
+            icon: redhat
   widgets.yaml: |
     - resources:
         cpu: true
