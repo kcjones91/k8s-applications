@@ -41,7 +41,7 @@ spec:
         - name: DOMAIN
           value: "https://vault.lab.swipe.lat"
         - name: SIGNUPS_ALLOWED
-          value: "true"
+          value: "false"
         - name: ADMIN_TOKEN
           valueFrom:
             secretKeyRef:
