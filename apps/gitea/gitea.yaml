@@ -54,10 +54,15 @@ spec:
           value: sqlite3
         - name: GITEA__server__ROOT_URL
           value: "https://gitea.lab.swipe.lat/"
+        # SSH is served on its own LoadBalancer VIP (.244), not the
+        # Gateway VIP (.240). Cilium 1.19 has no TCPRoute support, so
+        # the Gateway cannot carry port 22.
         - name: GITEA__server__SSH_DOMAIN
-          value: "gitea.lab.swipe.lat"
+          value: "gitea-ssh.lab.swipe.lat"
         - name: GITEA__server__SSH_PORT
-          value: "30222"
+          value: "22"
+        - name: GITEA__server__SSH_LISTEN_PORT
+          value: "22"
         - name: GITEA__service__DISABLE_REGISTRATION
           value: "true"
         - name: GITEA__security__INSTALL_LOCK
@@ -94,6 +99,24 @@ spec:
     port: 22
     targetPort: 22
     nodePort: 30222
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: gitea-ssh
+  namespace: gitea
+  annotations:
+    lbipam.cilium.io/ips: "192.168.1.244"
+spec:
+  type: LoadBalancer
+  externalTrafficPolicy: Cluster
+  selector:
+    app: gitea
+  ports:
+  - name: ssh
+    port: 22
+    targetPort: 22
+    protocol: TCP
 ---
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
