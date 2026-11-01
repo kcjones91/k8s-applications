@@ -108,7 +108,7 @@ spec:
                 - { name: VLLM_BASE_URL, value: "http://vllm.vllm.svc.cluster.local/v1" }
                 - { name: VLLM_MODEL, value: "Qwen3.5-9B" }   # must match --served-model-name
                 # "off" seeds state without paging anyone; flip to "on" after the first poll
-                - { name: SECBRIEF_ALERTS, value: "off" }
+                - { name: SECBRIEF_ALERTS, value: "on" }
               envFrom:
                 - secretRef: { name: secbrief-secrets }
               resources:
