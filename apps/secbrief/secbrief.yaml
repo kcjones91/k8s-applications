@@ -1,0 +1,184 @@
+# EE Security Brief (secbrief): CVE ladders, alerts, daily brief.
+# Code + image: github.com/kcjones91/ee-secbrief -> ghcr.io/kcjones91/ee-secbrief
+# Picked up by bootstrap/applicationset.yaml (apps/*), namespace = secbrief.
+#
+# Created out of band, never in git:
+#   secbrief-secrets    OPENCVE_TOKEN, RESEND_API_KEY
+#   secbrief-clients    one YAML per client (--from-file=clients/)
+#   ghcr-pull           docker-registry secret for the private GHCR image
+#   secbrief-inventory  optional, <client>.json from ansible/gather_inventory.yml
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: secbrief
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: secbrief-data
+  namespace: secbrief
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: secbrief-config
+  namespace: secbrief
+data:
+  config.yaml: |
+    sources:
+      opencve:
+        base_url: https://app.opencve.io/api
+        lookback_hours: 48
+        max_pages: 10
+      redhat:
+        base_url: https://access.redhat.com/hydra/rest/securitydata
+      kev_url: https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json
+      epss_url: https://api.first.org/data/v1/epss
+      poc_url_template: https://raw.githubusercontent.com/nomi-sec/PoC-in-GitHub/master/{year}/{cve}.json
+    components:
+      kernel:     { vendor: linux,   product: linux_kernel, rpm: kernel }
+      openssl:    { vendor: openssl, product: openssl,      rpm: openssl }
+      openssh:    { vendor: openbsd, product: openssh,      rpm: openssh-server }
+      nginx:      { vendor: f5,      product: nginx,        rpm: nginx }
+      containerd: { vendor: linuxfoundation, product: containerd, rpm: containerd }
+    os_components:
+      rhel-8:  [kernel, openssl, openssh]
+      rhel-9:  [kernel, openssl, openssh]
+      rhel-10: [kernel, openssl, openssh]
+    redhat_products:
+      rhel-8:  "Red Hat Enterprise Linux 8"
+      rhel-9:  "Red Hat Enterprise Linux 9"
+      rhel-10: "Red Hat Enterprise Linux 10"
+    scoring:
+      critical_cvss: 9.0
+      watch_cvss: 7.0
+      watch_epss: 0.10
+    llm:
+      base_url: http://vllm.vllm.svc.cluster.local/v1
+      model: Qwen3.5-9B
+      timeout_s: 90
+    email:
+      from: "EE Security Brief <security@engexcellence.co>"
+      subject_prefix: "Security Brief"
+  overrides.yaml: |
+    # Analyst-set facts. Can only RAISE a rung. Always cite a source.
+    CVE-2026-98432:
+      attack_rung: 2
+      mitigation: true
+      note: "Working exploit demonstrated by researchers, not publicly released."
+      source: https://access.redhat.com/security/vulnerabilities/RHSB-2026-016
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: secbrief-poll
+  namespace: secbrief
+spec:
+  schedule: "*/30 * * * *"
+  timeZone: "America/Chicago"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      activeDeadlineSeconds: 1500
+      template:
+        metadata:
+          labels: { app: secbrief-poll }
+        spec:
+          restartPolicy: Never
+          # private GHCR package: ghcr-pull is created out of band in this namespace
+          imagePullSecrets:
+            - name: ghcr-pull
+          securityContext: { runAsNonRoot: true, runAsUser: 10001, fsGroup: 10001 }
+          containers:
+            - name: poll
+              image: ghcr.io/kcjones91/ee-secbrief:v0.1.0   # pin a tag in GitOps
+              imagePullPolicy: IfNotPresent
+              args: ["poll"]
+              env:
+                # in-cluster route to the vllm Service (namespace vllm, port 80)
+                - { name: VLLM_BASE_URL, value: "http://vllm.vllm.svc.cluster.local/v1" }
+                - { name: VLLM_MODEL, value: "Qwen3.5-9B" }   # must match --served-model-name
+                # "off" seeds state without paging anyone; flip to "on" after the first poll
+                - { name: SECBRIEF_ALERTS, value: "off" }
+              envFrom:
+                - secretRef: { name: secbrief-secrets }
+              resources:
+                requests: { cpu: 50m, memory: 128Mi }
+                limits: { memory: 384Mi }
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities: { drop: [ALL] }
+              volumeMounts:
+                - { name: config, mountPath: /etc/secbrief/config, readOnly: true }
+                - { name: clients, mountPath: /etc/secbrief/clients, readOnly: true }
+                - { name: inventory, mountPath: /etc/secbrief/inventory, readOnly: true }
+                - { name: data, mountPath: /data }
+                - { name: tmp, mountPath: /tmp }
+          volumes:
+            - { name: config, configMap: { name: secbrief-config } }
+            - { name: clients, secret: { secretName: secbrief-clients } }
+            - { name: inventory, secret: { secretName: secbrief-inventory, optional: true } }
+            - { name: data, persistentVolumeClaim: { claimName: secbrief-data } }
+            - { name: tmp, emptyDir: {} }
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: secbrief-digest
+  namespace: secbrief
+spec:
+  # 07:12 America/Chicago; timeZone pins it across DST
+  schedule: "12 7 * * *"
+  timeZone: "America/Chicago"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      activeDeadlineSeconds: 1500
+      template:
+        metadata:
+          labels: { app: secbrief-digest }
+        spec:
+          restartPolicy: Never
+          securityContext: { runAsNonRoot: true, runAsUser: 10001, fsGroup: 10001 }
+          imagePullSecrets:
+            - name: ghcr-pull
+          containers:
+            - name: digest
+              image: ghcr.io/kcjones91/ee-secbrief:v0.1.0   # pin a tag in GitOps
+              imagePullPolicy: IfNotPresent
+              args: ["digest"]
+              env:
+                - { name: VLLM_BASE_URL, value: "http://vllm.vllm.svc.cluster.local/v1" }
+                - { name: VLLM_MODEL, value: "Qwen3.5-9B" }
+              envFrom:
+                - secretRef: { name: secbrief-secrets }
+              resources:
+                requests: { cpu: 50m, memory: 128Mi }
+                limits: { memory: 384Mi }
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities: { drop: [ALL] }
+              volumeMounts:
+                - { name: config, mountPath: /etc/secbrief/config, readOnly: true }
+                - { name: clients, mountPath: /etc/secbrief/clients, readOnly: true }
+                - { name: data, mountPath: /data }
+                - { name: tmp, mountPath: /tmp }
+          volumes:
+            - { name: config, configMap: { name: secbrief-config } }
+            - { name: clients, secret: { secretName: secbrief-clients } }
+            - { name: data, persistentVolumeClaim: { claimName: secbrief-data } }
+            - { name: tmp, emptyDir: {} }
