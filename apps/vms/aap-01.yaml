@@ -75,6 +75,8 @@ kind: Service
 metadata:
   name: aap-01
   namespace: vms
+  annotations:
+    lbipam.cilium.io/ips: "192.168.1.245"
 spec:
   # LoadBalancer rather than an HTTPRoute: AAP's gateway terminates
   # its own TLS, so putting it behind the Cilium Gateway would mean
