@@ -57,7 +57,8 @@ spec:
   blocks:
     # Must be OUTSIDE the router's DHCP range or you'll get
     # intermittent conflicts.
-    - start: "192.168.1.240"
+    - cidr: "192.168.1.240/32"
+    - start: "192.168.1.242"
       stop: "192.168.1.250"
 ---
 apiVersion: cilium.io/v2alpha1
