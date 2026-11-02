@@ -7,6 +7,7 @@
 #   secbrief-clients    one YAML per client (--from-file=clients/)
 #   ghcr-pull           docker-registry secret for the private GHCR image
 #   secbrief-inventory  optional, <client>.json from ansible/gather_inventory.yml
+#   cloudflared-threatwatch  TUNNEL_TOKEN for the Cloudflare Tunnel serving threats.engexcellence.co
 apiVersion: v1
 kind: Namespace
 metadata:
@@ -55,6 +56,17 @@ data:
       rhel-8:  "Red Hat Enterprise Linux 8"
       rhel-9:  "Red Hat Enterprise Linux 9"
       rhel-10: "Red Hat Enterprise Linux 10"
+    public:
+      # free Threat Watch page, rendered after every poll into /data/public
+      enabled: true
+      stacks: [rhel-8, rhel-9, rhel-10]
+      software: [nginx, containerd]
+      exposure: internet            # worst-case profile for the public view
+      multi_tenant_containers: true
+      site_url: https://threats.engexcellence.co
+      digest_url: https://engexcellence.co/contact
+      book_url: https://engexcellence.co/#book
+      radar_max: 8
     scoring:
       critical_cvss: 9.0
       watch_cvss: 7.0
@@ -68,11 +80,7 @@ data:
       subject_prefix: "Security Brief"
   overrides.yaml: |
     # Analyst-set facts. Can only RAISE a rung. Always cite a source.
-    CVE-2026-98432:
-      attack_rung: 2
-      mitigation: true
-      note: "Working exploit demonstrated by researchers, not publicly released."
-      source: https://access.redhat.com/security/vulnerabilities/RHSB-2026-016
+    {}
 ---
 apiVersion: batch/v1
 kind: CronJob
@@ -100,7 +108,7 @@ spec:
           securityContext: { runAsNonRoot: true, runAsUser: 10001, fsGroup: 10001 }
           containers:
             - name: poll
-              image: ghcr.io/kcjones91/ee-secbrief:v0.1.0   # pin a tag in GitOps
+              image: ghcr.io/kcjones91/ee-secbrief:v0.2.0   # pin a tag in GitOps
               imagePullPolicy: IfNotPresent
               args: ["poll"]
               env:
@@ -109,6 +117,8 @@ spec:
                 - { name: VLLM_MODEL, value: "Qwen3.5-9B" }   # must match --served-model-name
                 # "off" seeds state without paging anyone; flip to "on" after the first poll
                 - { name: SECBRIEF_ALERTS, value: "on" }
+                # re-render the free Threat Watch page after each poll (served by threatwatch below)
+                - { name: SECBRIEF_PUBLIC_OUT, value: "/data/public" }
               envFrom:
                 - secretRef: { name: secbrief-secrets }
               resources:
@@ -157,7 +167,7 @@ spec:
             - name: ghcr-pull
           containers:
             - name: digest
-              image: ghcr.io/kcjones91/ee-secbrief:v0.1.0   # pin a tag in GitOps
+              image: ghcr.io/kcjones91/ee-secbrief:v0.2.0   # pin a tag in GitOps
               imagePullPolicy: IfNotPresent
               args: ["digest"]
               env:
@@ -182,3 +192,122 @@ spec:
             - { name: clients, secret: { secretName: secbrief-clients } }
             - { name: data, persistentVolumeClaim: { claimName: secbrief-data } }
             - { name: tmp, emptyDir: {} }
+---
+# ---- Free Threat Watch: static page from the PVC, published via Cloudflare Tunnel ----
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: threatwatch-nginx
+  namespace: secbrief
+data:
+  default.conf: |
+    server {
+      listen 8080;
+      server_name _;
+      # only the rendered page dir; the SQLite DB in /data is never reachable
+      root /data/public;
+      index index.html;
+      server_tokens off;
+      location = /healthz { access_log off; return 200 "ok\n"; }
+      location ~ /\. { deny all; }          # temp files from atomic writes
+      location / {
+        try_files $uri $uri/ =404;
+        add_header Cache-Control "public, max-age=60" always;
+        add_header X-Content-Type-Options nosniff always;
+        add_header Referrer-Policy strict-origin-when-cross-origin always;
+        add_header X-Frame-Options DENY always;
+      }
+    }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: threatwatch
+  namespace: secbrief
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: threatwatch }
+  template:
+    metadata:
+      labels: { app: threatwatch }
+    spec:
+      # local-path PV pins this to the same node as the CronJobs (swipe-worker-3)
+      securityContext: { runAsNonRoot: true, runAsUser: 101, fsGroup: 10001 }
+      containers:
+        - name: nginx
+          image: nginxinc/nginx-unprivileged:1.27-alpine
+          ports:
+            - { name: http, containerPort: 8080 }
+          readinessProbe:
+            httpGet: { path: /healthz, port: http }
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /healthz, port: http }
+            periodSeconds: 30
+          resources:
+            requests: { cpu: 10m, memory: 16Mi }
+            limits: { memory: 64Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: [ALL] }
+          volumeMounts:
+            - { name: data, mountPath: /data, readOnly: true }
+            - { name: conf, mountPath: /etc/nginx/conf.d, readOnly: true }
+            - { name: tmp, mountPath: /tmp }
+      volumes:
+        - { name: data, persistentVolumeClaim: { claimName: secbrief-data, readOnly: true } }
+        - { name: conf, configMap: { name: threatwatch-nginx } }
+        - { name: tmp, emptyDir: {} }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: threatwatch
+  namespace: secbrief
+spec:
+  selector: { app: threatwatch }
+  ports:
+    - { name: http, port: 80, targetPort: http }
+---
+# Remotely-managed tunnel: the public hostname threats.engexcellence.co ->
+# http://threatwatch.secbrief.svc.cluster.local is configured in the Cloudflare dashboard.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cloudflared-threatwatch
+  namespace: secbrief
+spec:
+  replicas: 2
+  selector:
+    matchLabels: { app: cloudflared-threatwatch }
+  template:
+    metadata:
+      labels: { app: cloudflared-threatwatch }
+    spec:
+      securityContext: { runAsNonRoot: true, runAsUser: 65532 }
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector: { matchLabels: { app: cloudflared-threatwatch } }
+      containers:
+        - name: cloudflared
+          # pin to a current release from github.com/cloudflare/cloudflared/releases
+          image: cloudflare/cloudflared:latest
+          args: ["tunnel", "--no-autoupdate", "--metrics", "0.0.0.0:2000", "run"]
+          env:
+            - name: TUNNEL_TOKEN
+              valueFrom: { secretKeyRef: { name: cloudflared-threatwatch, key: TUNNEL_TOKEN } }
+          livenessProbe:
+            httpGet: { path: /ready, port: 2000 }
+            initialDelaySeconds: 10
+            periodSeconds: 20
+          resources:
+            requests: { cpu: 10m, memory: 32Mi }
+            limits: { memory: 128Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: [ALL] }
