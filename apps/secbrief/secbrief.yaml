@@ -105,7 +105,7 @@ spec:
           # private GHCR package: ghcr-pull is created out of band in this namespace
           imagePullSecrets:
             - name: ghcr-pull
-          securityContext: { runAsNonRoot: true, runAsUser: 10001, fsGroup: 10001 }
+          securityContext: { runAsNonRoot: true, runAsUser: 10001, fsGroup: 10001, seLinuxOptions: { level: "s0:c100,c200" } }
           containers:
             - name: poll
               image: ghcr.io/kcjones91/ee-secbrief:v0.2.0   # pin a tag in GitOps
@@ -162,7 +162,7 @@ spec:
           labels: { app: secbrief-digest }
         spec:
           restartPolicy: Never
-          securityContext: { runAsNonRoot: true, runAsUser: 10001, fsGroup: 10001 }
+          securityContext: { runAsNonRoot: true, runAsUser: 10001, fsGroup: 10001, seLinuxOptions: { level: "s0:c100,c200" } }
           imagePullSecrets:
             - name: ghcr-pull
           containers:
@@ -232,8 +232,10 @@ spec:
     metadata:
       labels: { app: threatwatch }
     spec:
-      # local-path PV pins this to the same node as the CronJobs (swipe-worker-3)
-      securityContext: { runAsNonRoot: true, runAsUser: 101, fsGroup: 10001 }
+      # local-path PV pins this to the same node as the CronJobs (swipe-worker-3).
+      # Same SELinux level as the CronJobs: worker-3 enforces SELinux, and pods with
+      # different MCS categories can't read each other's files on the shared PVC.
+      securityContext: { runAsNonRoot: true, runAsUser: 101, fsGroup: 10001, seLinuxOptions: { level: "s0:c100,c200" } }
       containers:
         - name: nginx
           image: nginxinc/nginx-unprivileged:1.27-alpine
@@ -294,8 +296,8 @@ spec:
           labelSelector: { matchLabels: { app: cloudflared-threatwatch } }
       containers:
         - name: cloudflared
-          # pin to a current release from github.com/cloudflare/cloudflared/releases
-          image: cloudflare/cloudflared:latest
+          # pinned; bump from github.com/cloudflare/cloudflared/releases
+          image: cloudflare/cloudflared:2026.10.7
           args: ["tunnel", "--no-autoupdate", "--metrics", "0.0.0.0:2000", "run"]
           env:
             - name: TUNNEL_TOKEN
