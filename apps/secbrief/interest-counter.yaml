@@ -60,6 +60,7 @@ metadata:
 spec:
   # hourly at :41; the 30-min poll picks the file up on its next run
   schedule: "41 * * * *"
+  suspend: true
   timeZone: "America/Chicago"
   concurrencyPolicy: Forbid
   successfulJobsHistoryLimit: 1
@@ -73,7 +74,7 @@ spec:
       template:
         spec:
           restartPolicy: Never
-          securityContext: { runAsNonRoot: true, runAsUser: 10001, fsGroup: 10001 }
+          securityContext: { runAsNonRoot: true, runAsUser: 10001, fsGroup: 10001, seLinuxOptions: { level: "s0:c100,c200" } }
           containers:
             - name: count
               image: python:3.13-alpine
