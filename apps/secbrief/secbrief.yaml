@@ -67,6 +67,24 @@ data:
       digest_url: https://engexcellence.co/contact
       book_url: https://engexcellence.co/#book
       radar_max: 8
+      # Platforms we get asked about but do not track. Muted chip + honest "not covered
+      # yet, want it?" panel with a signup form. Never matched, scored or laddered.
+      not_covered:
+        - id: windows
+          label: Windows Server
+          blurb: >-
+            We only publish what we follow closely enough to call a quiet day with
+            confidence. If Windows Server coverage would change whether you use this
+            page, say so below. Enough hands up and we build it, with the same rules
+            and ladders.
+          vendor_url: https://msrc.microsoft.com/update-guide
+          vendor_name: Microsoft Security Response Center
+      # form target for "i want this" (hidden field interest=<id>); empty = digest_url
+      interest_url: ""
+      # {"windows": 12} written by the signup counter; at or above the threshold the
+      # panel adds "others have asked for this". The count itself is never shown.
+      interest_file: ""        # or env SECBRIEF_INTEREST_FILE
+      interest_threshold: 10
     scoring:
       critical_cvss: 9.0
       watch_cvss: 7.0
@@ -108,7 +126,7 @@ spec:
           securityContext: { runAsNonRoot: true, runAsUser: 10001, fsGroup: 10001, seLinuxOptions: { level: "s0:c100,c200" } }
           containers:
             - name: poll
-              image: ghcr.io/kcjones91/ee-secbrief:v0.2.0   # pin a tag in GitOps
+              image: ghcr.io/kcjones91/ee-secbrief:v0.3.0   # pin a tag in GitOps
               imagePullPolicy: IfNotPresent
               args: ["poll"]
               env:
@@ -119,6 +137,8 @@ spec:
                 - { name: SECBRIEF_ALERTS, value: "on" }
                 # re-render the free Threat Watch page after each poll (served by threatwatch below)
                 - { name: SECBRIEF_PUBLIC_OUT, value: "/data/public" }
+                # signup counts for not_covered platforms; outside /data/public so nginx never serves it
+                - { name: SECBRIEF_INTEREST_FILE, value: "/data/interest.json" }
               envFrom:
                 - secretRef: { name: secbrief-secrets }
               resources:
@@ -167,7 +187,7 @@ spec:
             - name: ghcr-pull
           containers:
             - name: digest
-              image: ghcr.io/kcjones91/ee-secbrief:v0.2.0   # pin a tag in GitOps
+              image: ghcr.io/kcjones91/ee-secbrief:v0.3.0   # pin a tag in GitOps
               imagePullPolicy: IfNotPresent
               args: ["digest"]
               env:
