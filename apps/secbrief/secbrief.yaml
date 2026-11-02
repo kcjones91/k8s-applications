@@ -80,7 +80,7 @@ data:
           vendor_url: https://msrc.microsoft.com/update-guide
           vendor_name: Microsoft Security Response Center
       # form target for "i want this" (hidden field interest=<id>); empty = digest_url
-      interest_url: https://engexcellence.co/threat-watch/interest
+      interest_url: https://engexcellence.co/contact
       # {"windows": 12} written by the signup counter; at or above the threshold the
       # panel adds "others have asked for this". The count itself is never shown.
       interest_file: ""        # or env SECBRIEF_INTEREST_FILE
