@@ -3,7 +3,7 @@
 # Picked up by bootstrap/applicationset.yaml (apps/*), namespace = secbrief.
 #
 # Created out of band, never in git:
-#   secbrief-secrets    OPENCVE_TOKEN, RESEND_API_KEY
+#   secbrief-secrets    OPENCVE_TOKEN, RESEND_API_KEY, SECBRIEF_POSTURE_WEBHOOK
 #   secbrief-clients    one YAML per client (--from-file=clients/)
 #   ghcr-pull           docker-registry secret for the private GHCR image
 #   secbrief-inventory  optional, <client>.json from ansible/gather_inventory.yml
@@ -134,7 +134,7 @@ spec:
           securityContext: { runAsNonRoot: true, runAsUser: 10001, fsGroup: 10001, seLinuxOptions: { level: "s0:c100,c200" } }
           containers:
             - name: poll
-              image: ghcr.io/kcjones91/ee-secbrief:v0.7.1   # pin a tag in GitOps
+              image: ghcr.io/kcjones91/ee-secbrief:v0.7.2   # pin a tag in GitOps
               imagePullPolicy: IfNotPresent
               args: ["poll"]
               env:
@@ -195,7 +195,7 @@ spec:
             - name: ghcr-pull
           containers:
             - name: digest
-              image: ghcr.io/kcjones91/ee-secbrief:v0.7.1   # pin a tag in GitOps
+              image: ghcr.io/kcjones91/ee-secbrief:v0.7.2   # pin a tag in GitOps
               imagePullPolicy: IfNotPresent
               args: ["digest"]
               env:
