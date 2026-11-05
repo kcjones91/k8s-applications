@@ -236,6 +236,7 @@ data:
       root /data/public;
       index index.html;
       server_tokens off;
+      absolute_redirect off;   # directory redirects stay relative: no http://host:8080 leak behind the tunnel
       location = /healthz { access_log off; return 200 "ok\n"; }
       location ~ /\. { deny all; }          # temp files from atomic writes
       location / {
