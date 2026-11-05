@@ -95,6 +95,7 @@ data:
       critical_cvss: 9.0
       watch_cvss: 7.0
       watch_epss: 0.10
+      fix_grace_days: 14   # watchlist tiers: a released patch this old counts as resolved
     llm:
       base_url: http://vllm.vllm.svc.cluster.local/v1
       model: Qwen3.5-9B
