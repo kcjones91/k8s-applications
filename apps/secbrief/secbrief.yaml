@@ -134,7 +134,7 @@ spec:
           securityContext: { runAsNonRoot: true, runAsUser: 10001, fsGroup: 10001, seLinuxOptions: { level: "s0:c100,c200" } }
           containers:
             - name: poll
-              image: ghcr.io/kcjones91/ee-secbrief:v0.7.6   # pin a tag in GitOps
+              image: ghcr.io/kcjones91/ee-secbrief:v0.7.7   # pin a tag in GitOps
               imagePullPolicy: IfNotPresent
               args: ["poll"]
               env:
@@ -195,7 +195,7 @@ spec:
             - name: ghcr-pull
           containers:
             - name: digest
-              image: ghcr.io/kcjones91/ee-secbrief:v0.7.6   # pin a tag in GitOps
+              image: ghcr.io/kcjones91/ee-secbrief:v0.7.7   # pin a tag in GitOps
               imagePullPolicy: IfNotPresent
               args: ["digest"]
               env:
