@@ -1,0 +1,69 @@
+# Market Intel frontend (dashboard).
+# Lives at k8s-applications/apps/market-intel/03-frontend.yaml. The existing
+# swipe-lab-apps ApplicationSet picks it up with the rest of the directory.
+# Code + image: github.com/kcjones91/market-intel-frontend -> ghcr.io/kcjones91/market-intel-frontend
+#
+# Exposure: NodePort 30840, reachable on the LAN and over Tailscale only.
+# There is no login yet, so do not put this behind a public hostname as-is.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: intel-web
+  namespace: market-intel
+  labels:
+    app: intel-web
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: intel-web
+  template:
+    metadata:
+      labels:
+        app: intel-web
+    spec:
+      # imagePullSecrets:
+      #   - name: ghcr-pull          # only needed if the GHCR package stays private
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+      containers:
+        - name: web
+          image: ghcr.io/kcjones91/market-intel-frontend:v0.1.0   # pin a tag in GitOps
+          ports:
+            - containerPort: 3000
+          env:
+            # In-cluster address of the API Service. Read at runtime by the
+            # server components and by the /api/* proxy route.
+            - name: API_INTERNAL_URL
+              value: http://intel-api.market-intel.svc.cluster.local
+          readinessProbe:
+            httpGet: { path: /healthz, port: 3000 }
+            initialDelaySeconds: 3
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /healthz, port: 3000 }
+            initialDelaySeconds: 10
+            periodSeconds: 20
+          resources:
+            requests: { cpu: 100m, memory: 128Mi }
+            limits: { memory: 384Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: intel-web
+  namespace: market-intel
+  labels:
+    app: intel-web
+spec:
+  type: NodePort
+  selector:
+    app: intel-web
+  ports:
+    - name: http
+      port: 80
+      targetPort: 3000
+      nodePort: 30840
