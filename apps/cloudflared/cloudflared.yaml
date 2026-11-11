@@ -1,18 +1,9 @@
+# The tunnel token is NOT stored in git. Create it out of band:
+#   kubectl -n cloudflared create secret generic cloudflared-token --from-literal=token='<token>'
 apiVersion: v1
 kind: Namespace
 metadata:
   name: cloudflared
----
-apiVersion: v1
-kind: Secret
-metadata:
-  name: cloudflared-token
-  namespace: cloudflared
-type: Opaque
-stringData:
-  # Paste your tunnel token here, replacing the placeholder.
-  # Get it from Cloudflare Zero Trust → Networks → Tunnels → swipe-lab → Configure
-  token: "eyJhIjoiMTdiZjg0ZWE3YmQwODFjMGFmYWVhN2QzZTU5NGFkZTMiLCJ0IjoiN2YxMTMxNTMtYjQ4ZS00MjBmLTgyM2QtZDMzOGM2MjgwNGU4IiwicyI6Ik56QXdaalE0TmpVdFpEZ3dOQzAwWlRVeUxXRm1Oek10TldNeU9HTmpNekE0WmpCaCJ9"
 ---
 apiVersion: apps/v1
 kind: Deployment
