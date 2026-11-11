@@ -50,7 +50,7 @@ spec:
                 - name: VLLM_BASE_URL
                   value: http://vllm.vllm.svc.cluster.local/v1
                 - name: VLLM_MODEL
-                  value: Qwen/Qwen2.5-7B-Instruct
+                  value: Qwen3.5-9B
                 - name: SEC_USER_AGENT
                   value: "Kyle Jones kylejones199108@gmail.com"
               resources:
