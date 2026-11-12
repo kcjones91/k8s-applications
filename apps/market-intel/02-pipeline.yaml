@@ -26,17 +26,20 @@ spec:
           restartPolicy: Never
           containers:
             - name: pipeline
-              image: ghcr.io/kcjones91/market-intel-backend:v0.2.7  # pin a tag in GitOps
+              image: ghcr.io/kcjones91/market-intel-backend:v0.2.8  # pin a tag in GitOps
               command: ["/bin/sh", "-c"]
               args:
                 - |
-                  set -e
-                  echo "== collect: congress ==" &&
-                  python -m app.workers.run_congress &&
-                  echo "== collect: sec edgar ==" &&
-                  python -m app.workers.run_sec &&
-                  echo "== enrich: vLLM scoring ==" &&
-                  python -m app.workers.enrich
+                  # Every step runs even if an earlier one failed: one source being down must
+                  # not stop the others, and heat must be recomputed from whatever is stored
+                  # (it decays, so a skipped night leaves it too high). The job still fails
+                  # if any step failed.
+                  echo "== collect: congress =="; python -m app.workers.run_congress; a=$?
+                  echo "== collect: sec edgar =="; python -m app.workers.run_sec; b=$?
+                  echo "== enrich: vLLM scoring =="; python -m app.workers.enrich; c=$?
+                  echo "== heat: score companies and themes =="; python -m app.workers.run_heat; d=$?
+                  echo "== exit codes: congress=$a sec=$b enrich=$c heat=$d =="
+                  [ $((a|b|c|d)) -eq 0 ]
               env:
                 - name: POSTGRES_PASSWORD
                   valueFrom:
@@ -73,7 +76,7 @@ spec:
     spec:
       containers:
         - name: api
-          image: ghcr.io/kcjones91/market-intel-backend:v0.2.7      # pin a tag in GitOps
+          image: ghcr.io/kcjones91/market-intel-backend:v0.2.8      # pin a tag in GitOps
           ports:
             - { name: http, containerPort: 8000 }
           env:
