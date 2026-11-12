@@ -29,7 +29,7 @@ spec:
         runAsUser: 1000
       containers:
         - name: web
-          image: ghcr.io/kcjones91/market-intel-frontend:v0.1.2   # pin a tag in GitOps
+          image: ghcr.io/kcjones91/market-intel-frontend:v0.2.0   # pin a tag in GitOps
           ports:
             - containerPort: 3000
           env:
